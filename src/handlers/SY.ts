@@ -6,7 +6,7 @@ import { updatePoints } from "../points/point-manager.js";
 import { EVENT_USER_SHARE, POINT_SOURCE_SY } from "../types.js";
 
 /**
- * @dev 1 SY EZETH = 1 EZETH
+ * @dev 1 SY EETH = 1 EETH
  */
 
 const db = new AsyncNedb({

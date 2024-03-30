@@ -1,6 +1,6 @@
 # Pendle Kelp Balance Tracking 
 
-Pendle system wraps `ezETH` into an ERC5115 token `SY`.
+Pendle system wraps `eETH` into an ERC5115 token `SY`.
 
 `SY` can then be used in Pendle's system to:
 - Tokenize into `PT` and `YT`, where `YT` holders are entitled to all interests and rewards.
@@ -12,4 +12,4 @@ Pendle charges $3\%$ of all yields/rewards with assets on the platform. This is 
 
 ## Todo
 
-To modify the `calcPointsFromHolding` function in `./src/points/point-manager.ts` which returns the amount of points earned by users for holding `amountEzEthHolding` ezETH in `holdingPeriod` seconds.
+To modify the `calcPointsFromHolding` function in `./src/points/point-manager.ts` which returns the amount of points earned by users for holding `amountEEthHolding` eETH in `holdingPeriod` seconds.
