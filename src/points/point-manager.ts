@@ -18,47 +18,29 @@ function calcPointsFromHolding(
 ): bigint {
   // * eETH exchangeRate
   const pointsMultiplier = (MISC_CONSTS.EETH_POINT_RATE / MISC_CONSTS.ONE_E18) / 3600n;
-  let points = amountEEthHolding * pointsMultiplier * (holdingEndTimestamp - holdingStartTimestamp) * 2n;
+  let points = amountEEthHolding * (holdingEndTimestamp - holdingStartTimestamp) * 2n * pointsMultiplier;
 
   const campaignStartTime = BigInt(1713373200) // 4/17 13:00 EST
   const campaignEndTime = BigInt(1714582800) // 5/1 13:00 EST
 
     if (
+      holdingStartTimestamp < campaignStartTime &&
+      holdingEndTimestamp >= campaignStartTime    
+    ) {
+      // start before campaign start, end after campaign start
+      const endTime = holdingEndTimestamp < campaignEndTime ? holdingEndTimestamp : campaignEndTime
+      points +=
+        (endTime - campaignStartTime) *
+        amountEEthHolding * 2n * pointsMultiplier
+    } else if (
       holdingStartTimestamp >= campaignStartTime &&
-      holdingEndTimestamp >= campaignStartTime &&
-      holdingEndTimestamp <= campaignEndTime
+      holdingStartTimestamp <= campaignEndTime 
     ) {
-      // all within interval
-      points *= 3n
-    } else if (
-      holdingStartTimestamp <= campaignStartTime &&
-      holdingEndTimestamp >= campaignStartTime &&
-      holdingEndTimestamp <= campaignEndTime
-    ) {
-      // partial overlap at the start
+      // start after campaign start, and before campaign end
+      const endTime = holdingEndTimestamp < campaignEndTime ? holdingEndTimestamp : campaignEndTime
       points +=
-        (holdingEndTimestamp - campaignStartTime) *
-        amountEEthHolding * pointsMultiplier * 
-        2n
-    } else if (
-      holdingEndTimestamp >= campaignEndTime &&
-      holdingStartTimestamp >= campaignStartTime &&
-      holdingStartTimestamp < campaignEndTime
-    ) {
-      // partial overlap at the end
-      points +=
-        (campaignEndTime - holdingStartTimestamp) *
-        amountEEthHolding * pointsMultiplier * 
-        2n
-    } else if (
-      holdingEndTimestamp > campaignEndTime &&
-      holdingStartTimestamp < campaignStartTime
-    ) {
-      // full overlap
-      points +=
-        (campaignEndTime - campaignStartTime) *
-        amountEEthHolding * pointsMultiplier * 
-        2n
+        (endTime - holdingStartTimestamp) *
+        amountEEthHolding * 2n * pointsMultiplier
     }
 
   return points
