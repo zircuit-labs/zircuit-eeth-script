@@ -13,10 +13,55 @@ import { EVENT_POINT_INCREASE, POINT_SOURCE, POINT_SOURCE_YT } from "../types.js
  */
 function calcPointsFromHolding(
   amountEEthHolding: bigint,
-  holdingPeriod: bigint
+  holdingStartTimestamp: bigint,
+  holdingEndTimestamp: bigint,
 ): bigint {
   // * eETH exchangeRate
-  return amountEEthHolding * MISC_CONSTS.EETH_POINT_RATE / MISC_CONSTS.ONE_E18 * holdingPeriod / 3600n;
+  const pointsMultiplier = (MISC_CONSTS.EETH_POINT_RATE / MISC_CONSTS.ONE_E18) / 3600n;
+  let points = amountEEthHolding * pointsMultiplier * (holdingEndTimestamp - holdingStartTimestamp);
+
+  const campaignStartTime = BigInt(1713373200) // 4/17 13:00 EST
+  const campaignEndTime = BigInt(1714582800) // 5/1 13:00 EST
+
+    if (
+      holdingStartTimestamp >= campaignStartTime &&
+      holdingEndTimestamp >= campaignStartTime &&
+      holdingEndTimestamp <= campaignEndTime
+    ) {
+      // all within interval
+      points *= 3n
+    } else if (
+      holdingStartTimestamp <= campaignStartTime &&
+      holdingEndTimestamp >= campaignStartTime &&
+      holdingEndTimestamp <= campaignEndTime
+    ) {
+      // partial overlap at the start
+      points +=
+        (holdingEndTimestamp - campaignStartTime) *
+        amountEEthHolding * pointsMultiplier * 
+        2n
+    } else if (
+      holdingEndTimestamp >= campaignEndTime &&
+      holdingStartTimestamp >= campaignStartTime &&
+      holdingStartTimestamp < campaignEndTime
+    ) {
+      // partial overlap at the end
+      points +=
+        (campaignEndTime - holdingStartTimestamp) *
+        amountEEthHolding * pointsMultiplier * 
+        2n
+    } else if (
+      holdingEndTimestamp > campaignEndTime &&
+      holdingStartTimestamp < campaignStartTime
+    ) {
+      // full overlap
+      points +=
+        (campaignEndTime - campaignStartTime) *
+        amountEEthHolding * pointsMultiplier * 
+        2n
+    }
+
+  return points
 }
 
 export function updatePoints(
@@ -24,13 +69,17 @@ export function updatePoints(
   label: POINT_SOURCE,
   account: string,
   amountEEthHolding: bigint,
-  holdingPeriod: bigint,
+  holdingStartTimestamp:bigint,
+  holdingEndTimestamp:bigint,
   updatedAt: number
 ) {
   const zPoint = calcPointsFromHolding(
     amountEEthHolding,
-    holdingPeriod
+    holdingStartTimestamp,
+    holdingEndTimestamp,
   );
+
+  const holdingPeriod = holdingEndTimestamp - holdingStartTimestamp;
 
   if (label == POINT_SOURCE_YT) {
     const zPointTreasuryFee = calcTreasuryFee(zPoint);

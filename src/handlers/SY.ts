@@ -46,7 +46,8 @@ async function processAccount(account: string, ctx: ERC20Context) {
       POINT_SOURCE_SY,
       account,
       BigInt(snapshot.lastBalance),
-      BigInt(timestamp - snapshot.lastUpdatedAt),
+      BigInt(snapshot.lastUpdatedAt),
+      BigInt(timestamp),
       timestamp
     );
   }
