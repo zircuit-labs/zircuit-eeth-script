@@ -20,8 +20,9 @@ function calcPointsFromHolding(
   const pointsMultiplier = (MISC_CONSTS.EETH_POINT_RATE / MISC_CONSTS.ONE_E18) / 3600n;
   let points = amountEEthHolding * (holdingEndTimestamp - holdingStartTimestamp) * 2n * pointsMultiplier;
 
-  const campaignStartTime = BigInt(1713373200) // 4/17 13:00 EST
-  const campaignEndTime = BigInt(1714582800) // 5/1 13:00 EST
+  const campaignStartTime = 1713373200n // 4/17 13:00 EST
+  const campaignEndTime = 1714582800n // 5/1 13:00 EST
+  const campaignMultiplier = 3n
 
     if (
       holdingStartTimestamp < campaignStartTime &&
@@ -29,18 +30,20 @@ function calcPointsFromHolding(
     ) {
       // start before campaign start, end after campaign start
       const endTime = holdingEndTimestamp < campaignEndTime ? holdingEndTimestamp : campaignEndTime
+      // there's already 1 times points from the points calculation so we need to subtract 1 from campaignMultiplier
       points +=
         (endTime - campaignStartTime) *
-        amountEEthHolding * 2n * pointsMultiplier
+        amountEEthHolding * 2n * (campaignMultiplier - 1n) * pointsMultiplier
     } else if (
       holdingStartTimestamp >= campaignStartTime &&
       holdingStartTimestamp <= campaignEndTime 
     ) {
       // start after campaign start, and before campaign end
       const endTime = holdingEndTimestamp < campaignEndTime ? holdingEndTimestamp : campaignEndTime
+      // there's already 1 times points from the points calculation so we need to subtract 1 from campaignMultiplier
       points +=
         (endTime - holdingStartTimestamp) *
-        amountEEthHolding * 2n * pointsMultiplier
+        amountEEthHolding * 2n * (campaignMultiplier - 1n) * pointsMultiplier
     }
 
   return points
