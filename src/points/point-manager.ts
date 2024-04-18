@@ -18,7 +18,7 @@ function calcPointsFromHolding(
 ): bigint {
   // * eETH exchangeRate
   const pointsMultiplier = (MISC_CONSTS.EETH_POINT_RATE / MISC_CONSTS.ONE_E18) / 3600n;
-  let points = amountEEthHolding * pointsMultiplier * (holdingEndTimestamp - holdingStartTimestamp);
+  let points = amountEEthHolding * pointsMultiplier * (holdingEndTimestamp - holdingStartTimestamp) * 2n;
 
   const campaignStartTime = BigInt(1713373200) // 4/17 13:00 EST
   const campaignEndTime = BigInt(1714582800) // 5/1 13:00 EST
