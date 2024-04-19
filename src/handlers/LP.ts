@@ -133,7 +133,8 @@ async function updateAccount(
       POINT_SOURCE_LP,
       account,
       BigInt(snapshot.lastImpliedHolding),
-      BigInt(timestamp - snapshot.lastUpdatedAt),
+      BigInt(snapshot.lastUpdatedAt),
+      BigInt(timestamp),
       timestamp
     );
   }

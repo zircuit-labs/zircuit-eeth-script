@@ -13,10 +13,36 @@ import { EVENT_POINT_INCREASE, POINT_SOURCE, POINT_SOURCE_YT } from "../types.js
  */
 function calcPointsFromHolding(
   amountEEthHolding: bigint,
-  holdingPeriod: bigint
+  holdingStartTimestamp: bigint,
+  holdingEndTimestamp: bigint,
 ): bigint {
+  const campaignStartTime = 1713373200n // 4/17 13:00 EST
+  const campaignEndTime = 1714582800n // 5/1 13:00 EST
+  const campaignMultiplier = 3n
+  const baseMultiplier = 2n
+
   // * eETH exchangeRate
-  return amountEEthHolding * MISC_CONSTS.EETH_POINT_RATE / MISC_CONSTS.ONE_E18 * holdingPeriod / 3600n;
+  let points = amountEEthHolding * MISC_CONSTS.EETH_POINT_RATE / MISC_CONSTS.ONE_E18 * (holdingEndTimestamp - holdingStartTimestamp) * baseMultiplier / 3600n;
+
+    if (
+      holdingStartTimestamp < campaignStartTime &&
+      holdingEndTimestamp >= campaignStartTime    
+    ) {
+      // start before campaign start, end after campaign start
+      const endTime = holdingEndTimestamp < campaignEndTime ? holdingEndTimestamp : campaignEndTime
+      // there's already 1 times points from the points calculation so we need to subtract 1 from campaignMultiplier
+      points += amountEEthHolding  * MISC_CONSTS.EETH_POINT_RATE / MISC_CONSTS.ONE_E18 * (endTime - campaignStartTime) * (campaignMultiplier - baseMultiplier) / 3600n
+    } else if (
+      holdingStartTimestamp >= campaignStartTime &&
+      holdingStartTimestamp <= campaignEndTime 
+    ) {
+      // start after campaign start, and before campaign end
+      const endTime = holdingEndTimestamp < campaignEndTime ? holdingEndTimestamp : campaignEndTime
+      // there's already 1 times points from the points calculation so we need to subtract 1 from campaignMultiplier
+      points += amountEEthHolding * MISC_CONSTS.EETH_POINT_RATE / MISC_CONSTS.ONE_E18 * (endTime - holdingStartTimestamp) * (campaignMultiplier - baseMultiplier) / 3600n
+    }
+
+  return points
 }
 
 export function updatePoints(
@@ -24,13 +50,17 @@ export function updatePoints(
   label: POINT_SOURCE,
   account: string,
   amountEEthHolding: bigint,
-  holdingPeriod: bigint,
+  holdingStartTimestamp:bigint,
+  holdingEndTimestamp:bigint,
   updatedAt: number
 ) {
   const zPoint = calcPointsFromHolding(
     amountEEthHolding,
-    holdingPeriod
+    holdingStartTimestamp,
+    holdingEndTimestamp,
   );
+
+  const holdingPeriod = holdingEndTimestamp - holdingStartTimestamp;
 
   if (label == POINT_SOURCE_YT) {
     const zPointTreasuryFee = calcTreasuryFee(zPoint);
