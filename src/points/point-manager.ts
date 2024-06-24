@@ -1,9 +1,15 @@
 import { LogLevel } from "@sentio/sdk";
 import { EthContext } from "@sentio/sdk/eth";
-import { MISC_CONSTS, PENDLE_POOL_ADDRESSES, MULTIPLIERS } from "../consts.js";
+import {
+  MISC_CONSTS,
+  PENDLE_POOL_ADDRESSES,
+  MULTIPLIERS,
+  V1_END_TIMESTAMP,
+} from "../consts.js";
 import {
   EVENT_POINT_INCREASE,
   POINT_SOURCE,
+  POINT_SOURCE_SY,
   POINT_SOURCE_YT,
 } from "../types.js";
 
@@ -75,6 +81,11 @@ function calcPointsFromHolding(
   return points;
 }
 
+/**
+ * @dev Since the same SY contract is used for the new pool and the old pool,
+ * it's possible to double count the points if calculation starts before v1 processor end time.
+ * For the V2 processor, we need to make sure the SY points are only calculated after the V1 processor stops.
+ */
 export function updatePoints(
   ctx: EthContext,
   label: POINT_SOURCE,
@@ -84,6 +95,17 @@ export function updatePoints(
   holdingEndTimestamp: bigint,
   updatedAt: number
 ) {
+  if (label == POINT_SOURCE_SY) {
+    if (holdingEndTimestamp <= V1_END_TIMESTAMP) {
+      return;
+    }
+
+    holdingStartTimestamp =
+      holdingStartTimestamp < V1_END_TIMESTAMP + 1n
+        ? V1_END_TIMESTAMP + 1n
+        : holdingStartTimestamp;
+  }
+
   const zPoint = calcPointsFromHolding(
     amountEEthHolding,
     holdingStartTimestamp,
