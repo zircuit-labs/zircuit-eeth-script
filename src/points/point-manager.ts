@@ -16,7 +16,8 @@ import {
 /**
  *
  * @param amountEEthHolding amount of eEth user holds during the period
- * @param holdingPeriod amount of time user holds the eEth
+ * @param holdingStartTimestamp start timestamp of the holding period
+ * @param holdingEndTimestamp end timestamp of the holding period
  * @returns Zircuit point
  *
  * @dev to be reviewed by Zircuit team
