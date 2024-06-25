@@ -20,7 +20,7 @@ function calcPointsFromHolding(
   const campaignEndTime = 1714582800n // 5/1 13:00 EST
   const cuttoffTimestamp =  1719446400n // 27/06 12:00 AM GMT
 
-  if(holdingStartTimestamp >= cuttoffTimestamp) return BigInt(0)
+  if(holdingStartTimestamp >= cuttoffTimestamp) return 0n
   if(holdingEndTimestamp >= cuttoffTimestamp) holdingEndTimestamp = cuttoffTimestamp
 
   const campaignMultiplier = 3n
