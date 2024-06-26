@@ -32,6 +32,10 @@ function calcPointsFromHolding(
   const campaignMultiplier = MULTIPLIERS.campaign.multiplier;
   const baseMultiplier = MULTIPLIERS.multiplier;
   const baseFactor = MULTIPLIERS.baseFactor;
+  const expiry = MULTIPLIERS.expiry;
+
+  if (holdingStartTimestamp >= expiry) return BigInt(0);
+  if (holdingEndTimestamp >= expiry) holdingEndTimestamp = expiry;
 
   // * eETH exchangeRate
   let points =

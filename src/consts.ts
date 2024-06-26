@@ -50,4 +50,5 @@ export const MULTIPLIERS = {
   },
   multiplier: 150n,
   baseFactor: 100n,
+  expiry: 1724284800n, // 2024-08-22 00:00:00 UTC
 };
