@@ -74,7 +74,8 @@ export async function processAllYTAccounts(
         POINT_SOURCE_YT,
         address,
         BigInt(snapshot.lastImpliedHolding),
-        BigInt(ts.valueOf() - snapshot.lastUpdatedAt.valueOf()),
+        BigInt(snapshot.lastUpdatedAt.valueOf()),
+      BigInt(timestamp),
         timestamp
       );
     }
