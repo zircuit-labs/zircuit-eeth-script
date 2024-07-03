@@ -24,7 +24,7 @@ async function processAccount(account: string, ctx: ERC20Context) {
   const timestamp = getUnixTimestamp(ctx.timestamp);
   const ts : bigint = BigInt(timestamp).valueOf();
 
-  const accountId = account + POINT_SOURCE_SY;
+  const accountId = account.toLowerCase() + POINT_SOURCE_SY;
   const snapshot = await ctx.store.get(AccountSnapshot, accountId);
   if (snapshot && snapshot.lastUpdatedAt < ts) {
     updatePoints(

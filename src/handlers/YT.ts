@@ -65,7 +65,7 @@ export async function processAllYTAccounts(
     const balance = allYTBalances[i];
     const interestData = allYTPositions[i];
 
-    const accountId = address + POINT_SOURCE_YT;
+    const accountId = address.toLowerCase() + POINT_SOURCE_YT;
     const snapshot = await ctx.store.get(AccountSnapshot, accountId);
     const ts : bigint = BigInt(timestamp).valueOf();
     if (snapshot && snapshot.lastUpdatedAt < ts) {

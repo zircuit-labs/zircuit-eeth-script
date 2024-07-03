@@ -110,7 +110,7 @@ async function updateAccount(
   impliedSy: bigint,
   timestamp: number
 ) {
-  const accountId = account + POINT_SOURCE_LP;
+  const accountId = account.toLowerCase() + POINT_SOURCE_LP;
   const snapshot = await ctx.store.get(AccountSnapshot, accountId);
   const ts : bigint = BigInt(timestamp).valueOf();
   if (snapshot && snapshot.lastUpdatedAt < timestamp) {

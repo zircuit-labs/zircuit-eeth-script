@@ -38,6 +38,6 @@ export function isSentioInternalError(err: any): boolean {
 export async function getAllAddresses(ctx : EthContext) {
     // removes the suffix comprised of two letters coming from POINT_SOURCE
     const addresses = (await ctx.store.list(AccountSnapshot))
-        .map((snapshot) => snapshot.id.toString().slice(0, -2));
+        .map((snapshot) => snapshot.id.toString().toLowerCase().slice(0, -2));
     return [...new Set(addresses)];
 }
