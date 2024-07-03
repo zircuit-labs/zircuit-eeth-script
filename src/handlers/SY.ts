@@ -1,7 +1,7 @@
-import { AsyncNedb } from "nedb-async";
+import { AccountSnapshot } from "../schema/schema.ts"
 import { TransferEvent } from "../types/eth/pendlemarket.js";
 import { ERC20Context } from "@sentio/sdk/eth/builtin/erc20";
-import { getUnixTimestamp, isPendleAddress } from "../helper.js";
+import { getUnixTimestamp, isPendleAddress, getAllAddresses } from "../helper.js";
 import { updatePoints } from "../points/point-manager.js";
 import { EVENT_USER_SHARE, POINT_SOURCE_SY } from "../types.js";
 
@@ -9,44 +9,30 @@ import { EVENT_USER_SHARE, POINT_SOURCE_SY } from "../types.js";
  * @dev 1 SY EETH = 1 EETH
  */
 
-const db = new AsyncNedb({
-  filename: "/data/pendle-accounts-sy.db",
-  autoload: true,
-});
-
-db.persistence.setAutocompactionInterval(60 * 1000);
-
-
-type AccountSnapshot = {
-  _id: string;
-  lastUpdatedAt: number;
-  lastBalance: string;
-};
-
 export async function handleSYTransfer(evt: TransferEvent, ctx: ERC20Context) {
   await processAccount(evt.args.from, ctx);
   await processAccount(evt.args.to, ctx);
 }
 
 export async function processAllAccounts(ctx: ERC20Context) {
-  const accountSnapshots = await db.asyncFind<AccountSnapshot>({});
-  await Promise.all(
-    accountSnapshots.map((snapshot) => processAccount(snapshot._id, ctx))
-  );
+  const allAddresses = await getAllAddresses(ctx);
+  await Promise.all(allAddresses.map((a) => processAccount(a, ctx)));
 }
 
 async function processAccount(account: string, ctx: ERC20Context) {
   if (isPendleAddress(account)) return;
   const timestamp = getUnixTimestamp(ctx.timestamp);
+  const ts : bigint = BigInt(timestamp).valueOf();
 
-  const snapshot = await db.asyncFindOne<AccountSnapshot>({ _id: account });
-  if (snapshot && snapshot.lastUpdatedAt < timestamp) {
+  const accountId = account.toLowerCase() + POINT_SOURCE_SY;
+  const snapshot = await ctx.store.get(AccountSnapshot, accountId);
+  if (snapshot && snapshot.lastUpdatedAt < ts) {
     updatePoints(
       ctx,
       POINT_SOURCE_SY,
       account,
       BigInt(snapshot.lastBalance),
-      BigInt(snapshot.lastUpdatedAt),
+      BigInt(snapshot.lastUpdatedAt.valueOf()),
       BigInt(timestamp),
       timestamp
     );
@@ -54,11 +40,12 @@ async function processAccount(account: string, ctx: ERC20Context) {
 
   const newBalance = await ctx.contract.balanceOf(account);
 
-  const newSnapshot = {
-    _id: account,
-    lastUpdatedAt: timestamp,
+  const newSnapshot = new AccountSnapshot({
+    id: accountId,
+    lastUpdatedAt: BigInt(timestamp),
+    lastImpliedHolding: snapshot ? snapshot.lastImpliedHolding.toString() : "",
     lastBalance: newBalance.toString(),
-  };
+  });
 
   ctx.eventLogger.emit(EVENT_USER_SHARE, {
     label: POINT_SOURCE_SY,
@@ -66,5 +53,5 @@ async function processAccount(account: string, ctx: ERC20Context) {
     share: newBalance,
   })
 
-  await db.asyncUpdate({ _id: account }, newSnapshot, { upsert: true });
+  await ctx.store.upsert(newSnapshot);
 }
