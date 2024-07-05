@@ -97,11 +97,13 @@ export async function processAllLPAccounts(
   }
 
   const timestamp = getUnixTimestamp(ctx.timestamp);
+  const updateAccountPromises = []
   for (let i = 0; i < allAddresses.length; i++) {
     const account = allAddresses[i];
     const impliedSy = (allUserShares[i] * state.totalSy) / totalShare;
-    await updateAccount(ctx, account, impliedSy, timestamp);
+    updateAccountPromises.push(updateAccount(ctx, account, impliedSy, timestamp));
   }
+  await Promise.all(updateAccountPromises)
 }
 
 async function updateAccount(
