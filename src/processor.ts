@@ -1,15 +1,12 @@
-import { Counter, Gauge } from '@sentio/sdk'
 import { ERC20Processor } from '@sentio/sdk/eth/builtin'
-import { MISC_CONSTS, PENDLE_POOL_ADDRESSES, CONFIG } from './consts.js'
-import { isPendleAddress } from './helper.js'
+import { MISC_CONSTS, PENDLE_POOL_ADDRESSES, CONFIG } from './consts.ts'
 import { handleSYTransfer } from './handlers/SY.js'
 import { PendleYieldTokenProcessor } from './types/eth/pendleyieldtoken.js'
 import { handleYTRedeemInterest, handleYTTransfer, processAllYTAccounts } from './handlers/YT.js'
-import { PendleMarketProcessor, getPendleMarketContractOnContext } from './types/eth/pendlemarket.js'
+import { PendleMarketProcessor } from './types/eth/pendlemarket.js'
 import { handleLPTransfer, handleMarketRedeemReward, handleMarketSwap, processAllLPAccounts } from './handlers/LP.js'
 import { EQBBaseRewardProcessor } from './types/eth/eqbbasereward.js'
 import { GLOBAL_CONFIG } from "@sentio/runtime";
-import { EthChainId } from '@sentio/sdk/eth'
 
 GLOBAL_CONFIG.execution = {
   sequential: true,
@@ -38,7 +35,7 @@ PendleYieldTokenProcessor.bind({
   await handleYTRedeemInterest(evt, ctx);
 }).onTimeInterval(async(_, ctx) => {
   await processAllYTAccounts(ctx);
-}, 24 * 60);
+}, MISC_CONSTS.ONE_DAY_IN_MINUTE);
 
 PendleMarketProcessor.bind({
   address: PENDLE_POOL_ADDRESSES.LP,
