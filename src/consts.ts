@@ -11,14 +11,32 @@ export const MISC_CONSTS = {
     ZERO_ADDRESS: "0x0000000000000000000000000000000000000000",
     MULTICALL_BATCH: 256,
     EETH_POINT_RATE: BigInt("1000000000000000000"),
+    PENDLE_DEFAULT_MULTIPLIER: BigInt(2),
+    CUTOFF_TIME: BigInt(1719446400), // 27/06 12:00 AM GMT
+    FULL_EXECUTION_INTERVAL: BigInt(86400),
 }
 
+export const MULTIPLIER_TIMELINE = [
+    {
+      timestamp: 0n,
+      factor: 200n,
+    },
+    {
+      timestamp: 1713373200n,
+      factor: 300n,
+    },
+    {
+      timestamp: 1714582800n,
+      factor: 200n,
+    }
+]
 
 export const PENDLE_POOL_ADDRESSES = {
     SY: "0xd7df7e085214743530aff339afc420c7c720bfa7",
     YT: "0x7c2d26182adeef96976035986cf56474fec03bda",
     LP: "0xe26d7f9409581f606242300fbfe63f56789f2169",
     START_BLOCK: 19516857,
+    END_BLOCK: 20199999,
     TREASURY: "0x8270400d528c34e1596ef367eedec99080a1b592",
     EQB_STAKING: "0xb68bba67c943665343d388302aa4c82754d4bd34",
     PENPIE_RECEIPT_TOKEN: "0xeb808b323d8b9f2e2424b83e8a08c5f2633c9254",
@@ -27,11 +45,13 @@ export const PENDLE_POOL_ADDRESSES = {
     LIQUID_LOCKERS: [
         {
             // Penpie
+            name: "PenPie",
             address: "0x6e799758cee75dae3d84e09d40dc416ecf713652",
             receiptToken: "0xeb808b323d8b9f2e2424b83e8a08c5f2633c9254",
         },
         {
             // EQB
+            name: "EQB",
             address: '0x64627901dadb46ed7f275fd4fc87d086cff1e6e3',
             receiptToken: "0xb68bba67c943665343d388302aa4c82754d4bd34",
         },
