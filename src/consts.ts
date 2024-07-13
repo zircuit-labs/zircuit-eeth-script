@@ -17,7 +17,7 @@ export const MISC_CONSTS = {
     MULTICALL_BATCH: 256,
     EETH_POINT_RATE: BigInt("1000000000000000000"),
     PENDLE_DEFAULT_MULTIPLIER: BigInt(2),
-    CUTOFF_TIME: END_TIME_V2,
+    CUTOFF_TIME: END_TIME_V1, // this should be changed for regular v2
     FULL_EXECUTION_INTERVAL: BigInt(86400),
 }
 

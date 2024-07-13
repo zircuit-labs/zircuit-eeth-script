@@ -75,7 +75,10 @@ ERC20Processor.bind({
     evt.args.from.toLowerCase(),
     evt.args.to.toLowerCase(),
   ]);
-});
+})
+  .onTimeInterval(async (_, ctx) => {
+    await processSYAccounts(ctx, []);
+  }, MISC_CONSTS.ONE_DAY_IN_MINUTE);
 
 PendleYieldTokenProcessor.bind({
   address: PENDLE_POOL_ADDRESSES.YT,

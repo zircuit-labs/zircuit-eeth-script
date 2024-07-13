@@ -48,6 +48,12 @@ export async function processSYAccounts(
     }
   }
 
+  if (timestamp > rerunSnapshot.updatedAt + MISC_CONSTS.FULL_EXECUTION_INTERVAL) {
+    ({ snapshots, addresses: allAddresses } = await getAllSYSnapshots(ctx));
+    rerunSnapshot.updatedAt = timestamp;
+    await ctx.store.upsert(rerunSnapshot);
+  }
+
   for (let address of addressesToAdd)
     if (!allAddresses.includes(address) && !isPendleOrZeroAddress(address)) {
       let accountSnapshot = await ctx.store.get(AccountSnapshotSY, address);
