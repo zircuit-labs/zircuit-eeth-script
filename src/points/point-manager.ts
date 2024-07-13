@@ -1,6 +1,11 @@
 import { LogLevel } from "@sentio/sdk";
 import { EthContext } from "@sentio/sdk/eth";
-import { MISC_CONSTS, PENDLE_POOL_ADDRESSES, MULTIPLIER_TIMELINE } from "../consts.js";
+import {
+  MISC_CONSTS,
+  PENDLE_POOL_ADDRESSES, 
+  MULTIPLIER_TIMELINE,
+  MULTIPLIER_TIMELINE_SY,
+} from "../consts.js";
 import { AccountSnapshotYT, AccountSnapshotSY } from "../schema/schema.ts";
 
 import {
@@ -28,7 +33,8 @@ export async function updatePointsYT(
     amountEEthHolding,
     holdingStartTimestamp,
     holdingEndTimestamp,
-    updatedAt
+    updatedAt,
+    MULTIPLIER_TIMELINE,
   );
 }
 
@@ -50,7 +56,8 @@ export async function updatePointsSY(
     amountEEthHolding,
     holdingStartTimestamp,
     holdingEndTimestamp,
-    updatedAt
+    updatedAt,
+    MULTIPLIER_TIMELINE_SY,
   );
 }
 
@@ -62,13 +69,15 @@ function updatePoints(
   holdingStartTimestamp: bigint,
   holdingEndTimestamp: bigint,
   updatedAt: bigint,
+  timeline: { timestamp: bigint; factor: bigint }[],
 ) {
   const holdingPeriod = holdingEndTimestamp - holdingStartTimestamp;
 
   const zPoint = calcPointsFromHolding(
     amountEEthHolding,
     holdingStartTimestamp,
-    holdingEndTimestamp
+    holdingEndTimestamp,
+    timeline
   );
 
   if (label == POINT_SOURCE_YT) {
@@ -107,7 +116,8 @@ function updatePoints(
 function calcPointsFromHolding(
   amountEEthHolding: bigint,
   holdingStartTimestamp: bigint,
-  holdingEndTimestamp: bigint
+  holdingEndTimestamp: bigint,
+  timeline: { timestamp: bigint; factor: bigint }[],
 ): bigint {
   const cutoffTimestamp = MISC_CONSTS.CUTOFF_TIME;
   if (holdingStartTimestamp >= cutoffTimestamp) return BigInt(0);
@@ -118,7 +128,7 @@ function calcPointsFromHolding(
     holdingStartTimestamp,
     holdingEndTimestamp,
     MISC_CONSTS.EETH_POINT_RATE,
-    MULTIPLIER_TIMELINE
+    timeline
   );
 
   return amountEEthHolding * 

@@ -67,8 +67,7 @@ ERC20Processor.bind({
 
 ERC20Processor.bind({
   address: PENDLE_POOL_ADDRESSES.SY,
-  startBlock: PENDLE_POOL_ADDRESSES.START_BLOCK,
-  endBlock: PENDLE_POOL_ADDRESSES.END_BLOCK,
+  startBlock: PENDLE_POOL_ADDRESSES.START_BLOCK_SY,
   name: "Pendle Pool SY",
   network: CONFIG.BLOCKCHAIN,
 }).onEventTransfer(async (evt, ctx) => {
@@ -81,7 +80,6 @@ ERC20Processor.bind({
 PendleYieldTokenProcessor.bind({
   address: PENDLE_POOL_ADDRESSES.YT,
   startBlock: PENDLE_POOL_ADDRESSES.START_BLOCK,
-  endBlock: PENDLE_POOL_ADDRESSES.END_BLOCK,
   name: "Pendle Pool YT",
   network: CONFIG.BLOCKCHAIN,
 })
