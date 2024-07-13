@@ -77,7 +77,7 @@ ERC20Processor.bind({
   ]);
 })
   .onTimeInterval(async (_, ctx) => {
-    await processSYAccounts(ctx, []);
+    await processSYAccounts(ctx);
   }, MISC_CONSTS.ONE_DAY_IN_MINUTE);
 
 PendleYieldTokenProcessor.bind({
