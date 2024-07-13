@@ -5,6 +5,7 @@ export const CONFIG = {
     BLOCKCHAIN: EthChainId.ETHEREUM,
 }
 
+const SEASON_1_END_TIME_BIGINT = BigInt(1720368000); // 7 july
 const START_TIME_V2 = BigInt(1719187200); // 24 june
 const END_TIME_V1 = BigInt(1719446400); // 27 june
 const END_TIME_V2 = BigInt(1724284800); // 22 august
@@ -17,7 +18,7 @@ export const MISC_CONSTS = {
     MULTICALL_BATCH: 256,
     EETH_POINT_RATE: BigInt("1000000000000000000"),
     PENDLE_DEFAULT_MULTIPLIER: BigInt(2),
-    CUTOFF_TIME: END_TIME_V1, // this should be changed for regular v2
+    CUTOFF_TIME: SEASON_1_END_TIME_BIGINT, // this should be changed for regular v2
     FULL_EXECUTION_INTERVAL: BigInt(86400),
 }
 
