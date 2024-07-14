@@ -18,7 +18,7 @@ export const MISC_CONSTS = {
     MULTICALL_BATCH: 256,
     EETH_POINT_RATE: BigInt("1000000000000000000"),
     PENDLE_DEFAULT_MULTIPLIER: BigInt(2),
-    CUTOFF_TIME: SEASON_1_END_TIME_BIGINT, // this should be changed for regular v2
+    CUTOFF_TIME: END_TIME_V2,
     FULL_EXECUTION_INTERVAL: BigInt(86400),
 }
 
@@ -28,7 +28,7 @@ export const MULTIPLIER_TIMELINE_SY = [
       factor: 0n,
     },
     {
-      timestamp: END_TIME_V1,
+      timestamp: SEASON_1_END_TIME_BIGINT,
       factor: 200n,
     },
     {
@@ -47,7 +47,7 @@ export const MULTIPLIER_TIMELINE = [
       factor: 0n,
     },    
     {
-      timestamp: START_TIME_V2,
+      timestamp: SEASON_1_END_TIME_BIGINT,
       factor: 200n,
     },
     {
