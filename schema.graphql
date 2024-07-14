@@ -1,0 +1,37 @@
+type AccountSnapshotLP @entity {
+  id: ID!
+  lastUpdatedAt: BigInt!
+  lastShare: BigInt!
+  lastCumulativeRate: BigInt!
+  lastCummulativeRatePenPie: BigInt!
+  lastSharePenPie: BigInt!
+  lastCummulativeRateEQB: BigInt!
+  lastShareEQB: BigInt!
+}
+
+type RateSnapshotLP @entity {
+  id: ID!
+  lastUpdatedAt: BigInt!
+  cummulativeRate: BigInt!
+  cummulativeRatePenPie: BigInt!
+  cummulativeRateEQB: BigInt!
+}
+
+type AccountSnapshotSY @entity {
+  id: ID!
+  lastUpdatedAt: BigInt!
+  lastBalance: BigInt!
+}
+
+type AccountSnapshotYT @entity {
+  id: ID!
+  lastUpdatedAt: BigInt!
+  lastImpliedHolding: BigInt!
+}
+
+type RerunSnapshot @entity {
+  id: ID!
+  updatedAt: BigInt!
+  ended: Boolean!
+}
+

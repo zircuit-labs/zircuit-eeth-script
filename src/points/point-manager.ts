@@ -1,66 +1,84 @@
 import { LogLevel } from "@sentio/sdk";
 import { EthContext } from "@sentio/sdk/eth";
-import { MISC_CONSTS, PENDLE_POOL_ADDRESSES } from "../consts.js";
-import { EVENT_POINT_INCREASE, POINT_SOURCE, POINT_SOURCE_YT } from "../types.js";
+import {
+  MISC_CONSTS,
+  PENDLE_POOL_ADDRESSES, 
+  MULTIPLIER_TIMELINE,
+  MULTIPLIER_TIMELINE_SY,
+} from "../consts.js";
+import { AccountSnapshotYT, AccountSnapshotSY } from "../schema/schema.ts";
 
-/**
- *
- * @param amountEEthHolding amount of eEth user holds during the period
- * @param holdingPeriod amount of time user holds the eEth
- * @returns Zircuit point
- *
- * @dev to be reviewed by Zircuit team
- */
-function calcPointsFromHolding(
-  amountEEthHolding: bigint,
-  holdingStartTimestamp: bigint,
-  holdingEndTimestamp: bigint,
-): bigint {
-  const campaignStartTime = 1713373200n // 4/17 13:00 EST
-  const campaignEndTime = 1714582800n // 5/1 13:00 EST
-  const campaignMultiplier = 3n
-  const baseMultiplier = 2n
+import {
+  EVENT_POINT_INCREASE,
+  POINT_SOURCE,
+  POINT_SOURCE_YT,
+} from "../types.js";
+import { getAccruedMultiplier } from "../helper.ts";
 
-  // * eETH exchangeRate
-  let points = amountEEthHolding * MISC_CONSTS.EETH_POINT_RATE / MISC_CONSTS.ONE_E18 * (holdingEndTimestamp - holdingStartTimestamp) * baseMultiplier / 3600n;
-
-    if (
-      holdingStartTimestamp < campaignStartTime &&
-      holdingEndTimestamp >= campaignStartTime    
-    ) {
-      // start before campaign start, end after campaign start
-      const endTime = holdingEndTimestamp < campaignEndTime ? holdingEndTimestamp : campaignEndTime
-      // there's already 1 times points from the points calculation so we need to subtract 1 from campaignMultiplier
-      points += amountEEthHolding  * MISC_CONSTS.EETH_POINT_RATE / MISC_CONSTS.ONE_E18 * (endTime - campaignStartTime) * (campaignMultiplier - baseMultiplier) / 3600n
-    } else if (
-      holdingStartTimestamp >= campaignStartTime &&
-      holdingStartTimestamp <= campaignEndTime 
-    ) {
-      // start after campaign start, and before campaign end
-      const endTime = holdingEndTimestamp < campaignEndTime ? holdingEndTimestamp : campaignEndTime
-      // there's already 1 times points from the points calculation so we need to subtract 1 from campaignMultiplier
-      points += amountEEthHolding * MISC_CONSTS.EETH_POINT_RATE / MISC_CONSTS.ONE_E18 * (endTime - holdingStartTimestamp) * (campaignMultiplier - baseMultiplier) / 3600n
-    }
-
-  return points
-}
-
-export function updatePoints(
+export async function updatePointsYT(
   ctx: EthContext,
   label: POINT_SOURCE,
   account: string,
   amountEEthHolding: bigint,
-  holdingStartTimestamp:bigint,
-  holdingEndTimestamp:bigint,
-  updatedAt: number
+  holdingStartTimestamp: bigint,
+  holdingEndTimestamp: bigint,
+  updatedAt: bigint,
+  accountSnapshot: AccountSnapshotYT
 ) {
+  await ctx.store.upsert(accountSnapshot);
+  updatePoints(
+    ctx,
+    label,
+    account,
+    amountEEthHolding,
+    holdingStartTimestamp,
+    holdingEndTimestamp,
+    updatedAt,
+    MULTIPLIER_TIMELINE,
+  );
+}
+
+export async function updatePointsSY(
+  ctx: EthContext,
+  label: POINT_SOURCE,
+  account: string,
+  amountEEthHolding: bigint,
+  holdingStartTimestamp: bigint,
+  holdingEndTimestamp: bigint,
+  updatedAt: bigint,
+  accountSnapshot: AccountSnapshotSY
+) {
+  await ctx.store.upsert(accountSnapshot);
+  updatePoints(
+    ctx,
+    label,
+    account,
+    amountEEthHolding,
+    holdingStartTimestamp,
+    holdingEndTimestamp,
+    updatedAt,
+    MULTIPLIER_TIMELINE_SY,
+  );
+}
+
+function updatePoints(
+  ctx: EthContext,
+  label: POINT_SOURCE,
+  account: string,
+  amountEEthHolding: bigint,
+  holdingStartTimestamp: bigint,
+  holdingEndTimestamp: bigint,
+  updatedAt: bigint,
+  timeline: { timestamp: bigint; factor: bigint }[],
+) {
+  const holdingPeriod = holdingEndTimestamp - holdingStartTimestamp;
+
   const zPoint = calcPointsFromHolding(
     amountEEthHolding,
     holdingStartTimestamp,
     holdingEndTimestamp,
+    timeline
   );
-
-  const holdingPeriod = holdingEndTimestamp - holdingStartTimestamp;
 
   if (label == POINT_SOURCE_YT) {
     const zPointTreasuryFee = calcTreasuryFee(zPoint);
@@ -95,6 +113,29 @@ export function updatePoints(
   }
 }
 
+function calcPointsFromHolding(
+  amountEEthHolding: bigint,
+  holdingStartTimestamp: bigint,
+  holdingEndTimestamp: bigint,
+  timeline: { timestamp: bigint; factor: bigint }[],
+): bigint {
+  const cutoffTimestamp = MISC_CONSTS.CUTOFF_TIME;
+  if (holdingStartTimestamp >= cutoffTimestamp) return BigInt(0);
+  if (holdingEndTimestamp >= cutoffTimestamp)
+    holdingEndTimestamp = cutoffTimestamp;
+
+  const accruedMultiplier = getAccruedMultiplier(
+    holdingStartTimestamp,
+    holdingEndTimestamp,
+    MISC_CONSTS.EETH_POINT_RATE,
+    timeline
+  );
+
+  return amountEEthHolding * 
+    accruedMultiplier /
+    (MISC_CONSTS.ONE_E18 * 3600n);
+}
+
 function increasePoint(
   ctx: EthContext,
   label: POINT_SOURCE,
@@ -102,11 +143,11 @@ function increasePoint(
   amountEEthHolding: bigint,
   holdingPeriod: bigint,
   zPoint: bigint,
-  updatedAt: number
+  updatedAt: bigint
 ) {
   ctx.eventLogger.emit(EVENT_POINT_INCREASE, {
     label,
-    account: account.toLowerCase(),
+    account,
     amountEEthHolding: amountEEthHolding.scaleDown(18),
     holdingPeriod,
     zPoint: zPoint.scaleDown(18),

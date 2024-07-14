@@ -1,4 +1,14 @@
-import { AsyncNedb } from "nedb-async";
+
+import { MISC_CONSTS, PENDLE_POOL_ADDRESSES, MULTIPLIER_TIMELINE } from "../consts.js";
+import { EthContext } from "@sentio/sdk/eth";
+import { LogLevel } from "@sentio/sdk";
+
+import { 
+  AccountSnapshotLP,
+  RateSnapshotLP,
+  RerunSnapshot,
+} from "../schema/schema.ts";
+
 import {
   PendleMarketContext,
   RedeemRewardsEvent,
@@ -6,83 +16,72 @@ import {
   TransferEvent,
   getPendleMarketContractOnContext,
 } from "../types/eth/pendlemarket.js";
-import { updatePoints } from "../points/point-manager.js";
-import { getUnixTimestamp, isLiquidLockerAddress, isSentioInternalError } from "../helper.js";
-import { MISC_CONSTS, PENDLE_POOL_ADDRESSES } from "../consts.js";
-import { getERC20ContractOnContext } from "@sentio/sdk/eth/builtin/erc20";
-import { EthContext } from "@sentio/sdk/eth";
-import { getMulticallContractOnContext } from "../types/eth/multicall.js";
-import { readAllUserActiveBalances, readAllUserERC20Balances } from "../multicall.js";
-import { EVENT_USER_SHARE, POINT_SOURCE_LP } from "../types.js";
+
+import {
+  getUnixTimestamp,
+  isLiquidLockerOrZeroAddress,
+  isSentioInternalError,
+  getAllLPSnapshots,
+  getAccruedMultiplier,
+} from "../helper.js";
+
+import {
+  readAllUserActiveBalances,
+  readAllUserERC20Balances,
+} from "../multicall.js";
+
+import {
+  EVENT_USER_SHARE,
+  POINT_SOURCE_LP,
+  EVENT_POINT_INCREASE,
+  POINT_SOURCE,
+  POINT_SOURCE_YT,
+} from "../types.js";
+
+const RATE_KEY = `RATES:${POINT_SOURCE_LP}`;
+const RERUN_KEY = `RERUN:${POINT_SOURCE_LP}`;
 
 /**
- * @dev 1 LP = (X PT + Y SY) where X and Y are defined by market conditions
- * So same as Balancer LPT, we need to update all positions on every swap
- *
- * Users can further deposit LP to liquid lockers to get back receipt tokens.
- * This should also be handled here.
- *
- * Currently for all liquid lockers, 1 receipt token = 1 LP
+ * @dev This function calculates the cumulative rate to convert LP into equivilent SY
+ * This function calculates three different rates:
+ * 1. the rate for liquid lockers - penpie
+ * 2. TODO: the rate for liquid lockers - EQB
+ * 3. TODO: the rate for the Zircuit points (time)
+ * and update the three different rates + timestamp to data store
  */
+export async function updateLPtoPointRates(ctx: EthContext) {
+  let rateSnapshot = await ctx.store.get(RateSnapshotLP, RATE_KEY);
+  let timestamp = BigInt(getUnixTimestamp(ctx.timestamp));
 
-const db = new AsyncNedb({
-  filename: "/data/pendle-accounts-lp.db",
-  autoload: true,
-});
+  // cuttoff time
+  if (timestamp > MISC_CONSTS.CUTOFF_TIME) timestamp = MISC_CONSTS.CUTOFF_TIME;
 
-db.persistence.setAutocompactionInterval(60 * 1000);
-
-type AccountSnapshot = {
-  _id: string;
-  lastUpdatedAt: number;
-  lastImpliedHolding: string;
-};
-
-export async function handleLPTransfer(
-  evt: TransferEvent,
-  ctx: PendleMarketContext
-) {
-  await processAllLPAccounts(ctx, [
-    evt.args.from.toLowerCase(),
-    evt.args.to.toLowerCase(),
-  ]);
-}
-
-export async function handleMarketRedeemReward(
-  evt: RedeemRewardsEvent,
-  ctx: PendleMarketContext
-) {
-  await processAllLPAccounts(ctx);
-}
-
-export async function handleMarketSwap(_: SwapEvent, ctx: PendleMarketContext) {
-  await processAllLPAccounts(ctx);
-}
-
-export async function processAllLPAccounts(
-  ctx: EthContext,
-  addressesToAdd: string[] = []
-) {
-  // might not need to do this on interval since we are doing it on every swap
-  const allAddresses = (await db.asyncFind<AccountSnapshot>({}))
-    .map((snapshot) => snapshot._id)
-
-  for (let address of addressesToAdd) {
-    address = address.toLowerCase()
-    if (!allAddresses.includes(address) && !isLiquidLockerAddress(address)) {
-      allAddresses.push(address)
-    }
+  if (!rateSnapshot) {
+    rateSnapshot = new RateSnapshotLP({
+      id: RATE_KEY,
+      lastUpdatedAt: timestamp,
+      cummulativeRate: BigInt(0),
+      cummulativeRatePenPie: BigInt(0),
+      cummulativeRateEQB: BigInt(0),
+    });
   }
+
   const marketContract = getPendleMarketContractOnContext(
     ctx,
     PENDLE_POOL_ADDRESSES.LP
   );
 
-  const [allUserShares, totalShare, state] = await Promise.all([
-    readAllUserActiveBalances(ctx, allAddresses),
+  const [totalShare, state] = await Promise.all([
     marketContract.totalActiveSupply(),
     marketContract.readState(marketContract.address),
   ]);
+
+  const accruedMultiplier = getAccruedMultiplier(
+    rateSnapshot.lastUpdatedAt,
+    timestamp,
+    MISC_CONSTS.EETH_POINT_RATE,
+    MULTIPLIER_TIMELINE
+  );
 
   for (const liquidLocker of PENDLE_POOL_ADDRESSES.LIQUID_LOCKERS) {
     const liquidLockerBal = await marketContract.balanceOf(
@@ -93,62 +92,187 @@ export async function processAllLPAccounts(
     const liquidLockerActiveBal = await marketContract.activeBalance(
       liquidLocker.address
     );
-    try {
-      const allUserReceiptTokenBalances = await readAllUserERC20Balances(
-        ctx,
-        allAddresses,
-        liquidLocker.receiptToken
-      );
-      for (let i = 0; i < allAddresses.length; i++) {
-        const userBal = allUserReceiptTokenBalances[i];
-        const userBoostedHolding =
-          (userBal * liquidLockerActiveBal) / liquidLockerBal;
-        allUserShares[i] += userBoostedHolding;
-      }
-    } catch (err) {
-      if (isSentioInternalError(err)) {
-        throw err;
-      }
+
+    if (liquidLocker.name === "PenPie") {
+      rateSnapshot.cummulativeRatePenPie +=
+        accruedMultiplier * liquidLockerActiveBal * state.totalSy / (liquidLockerBal * totalShare);
+    } else if (liquidLocker.name === "EQB") {
+      rateSnapshot.cummulativeRateEQB +=
+        accruedMultiplier * liquidLockerActiveBal * state.totalSy / (liquidLockerBal * totalShare);
     }
   }
 
-  const timestamp = getUnixTimestamp(ctx.timestamp);
-  for (let i = 0; i < allAddresses.length; i++) {
-    const account = allAddresses[i];
-    const impliedSy = (allUserShares[i] * state.totalSy) / totalShare;
-    await updateAccount(ctx, account, impliedSy, timestamp);
-  }
+  const cummulativeRate =
+    rateSnapshot.cummulativeRate +
+    accruedMultiplier * state.totalSy / totalShare;
+
+  rateSnapshot.cummulativeRate = cummulativeRate;
+  rateSnapshot.lastUpdatedAt = timestamp;
+
+  await ctx.store.upsert(rateSnapshot);
 }
 
-async function updateAccount(
+export async function processLPAccounts(
   ctx: EthContext,
-  account: string,
-  impliedSy: bigint,
-  timestamp: number
+  addressesToAdd: string[] = []
 ) {
-  const snapshot = await db.asyncFindOne<AccountSnapshot>({ _id: account });
-  if (snapshot && snapshot.lastUpdatedAt < timestamp) {
-    updatePoints(
+  let timestamp = BigInt(getUnixTimestamp(ctx.timestamp));
+  let rerunSnapshot = await ctx.store.get(RerunSnapshot, RERUN_KEY);
+  let rateSnapshot = await ctx.store.get(RateSnapshotLP, RATE_KEY);
+
+  if(!rerunSnapshot) {
+    rerunSnapshot = new RerunSnapshot({
+      id: RERUN_KEY,
+      ended: false,
+      updatedAt: timestamp,
+    })
+    await ctx.store.upsert(rerunSnapshot);
+  }
+
+  if(rerunSnapshot.ended) return;
+
+  if (!rateSnapshot) {
+    rateSnapshot = new RateSnapshotLP({
+      id: RATE_KEY,
+      lastUpdatedAt: timestamp,
+      cummulativeRate: BigInt(0),
+      cummulativeRatePenPie: BigInt(0),
+      cummulativeRateEQB: BigInt(0),
+    });
+  }
+  
+  let allAddresses: string[] = [];
+  let snapshots: AccountSnapshotLP[] = [];
+
+
+  if (timestamp > MISC_CONSTS.CUTOFF_TIME) {
+    timestamp = MISC_CONSTS.CUTOFF_TIME;
+    if (!rerunSnapshot.ended) {
+      rerunSnapshot.ended = true;
+      rerunSnapshot.updatedAt = timestamp;
+      ({ snapshots, addresses: allAddresses } = await getAllLPSnapshots(ctx));
+      await ctx.store.upsert(rerunSnapshot);
+    }
+  }
+
+  if (timestamp > rerunSnapshot.updatedAt + MISC_CONSTS.FULL_EXECUTION_INTERVAL) {
+    ({ snapshots, addresses: allAddresses } = await getAllLPSnapshots(ctx));
+    rerunSnapshot.updatedAt = timestamp;
+    await ctx.store.upsert(rerunSnapshot);
+  }
+
+  for (let address of addressesToAdd)
+    if (!allAddresses.includes(address) && !isLiquidLockerOrZeroAddress(address)) {
+      let accountSnapshot = await ctx.store.get(AccountSnapshotLP, address);
+      if (!accountSnapshot) 
+        accountSnapshot = new AccountSnapshotLP({
+          id: address,
+          lastUpdatedAt: BigInt(0),
+          lastShare: BigInt(0),
+          lastCumulativeRate: BigInt(0),
+          lastSharePenPie: BigInt(0),
+          lastCummulativeRatePenPie: BigInt(0),
+          lastShareEQB: BigInt(0),
+          lastCummulativeRateEQB: BigInt(0),
+        });
+      allAddresses.push(address);
+      snapshots.push(accountSnapshot);
+    }
+
+  if(allAddresses.length == 0) return;
+
+  let usersSharesPenPie: bigint[] = [];
+  let usersSharesEQB: bigint[] = [];
+
+  const usersShares =  await readAllUserActiveBalances(ctx, allAddresses)
+
+  try {
+    usersSharesPenPie = await readAllUserERC20Balances(
       ctx,
-      POINT_SOURCE_LP,
-      account,
-      BigInt(snapshot.lastImpliedHolding),
-      BigInt(snapshot.lastUpdatedAt),
-      BigInt(timestamp),
-      timestamp
+      allAddresses,
+      PENDLE_POOL_ADDRESSES.LIQUID_LOCKERS[0].receiptToken
+    )
+  } catch(err) {
+    if (isSentioInternalError(err)) {
+      throw err;
+    } 
+  }
+
+  try {
+    usersSharesEQB = await readAllUserERC20Balances(
+      ctx,
+      allAddresses,
+      PENDLE_POOL_ADDRESSES.LIQUID_LOCKERS[1].receiptToken
+    )
+  } catch(err) {
+    if (isSentioInternalError(err)) {
+      throw err;
+    }
+  }
+
+  const updateAccountPromises = [];
+
+  for (let i = 0; i < allAddresses.length; i++) {
+    const address = allAddresses[i];
+    let accountSnapshot = snapshots[i];
+
+    // timestamp can be rateSnapshot.lastUpdatedAt since update rates has to always be called first
+    const cumulativeRateDiff =
+      accountSnapshot.lastShare *
+        (rateSnapshot.cummulativeRate - accountSnapshot.lastCumulativeRate) +
+      accountSnapshot.lastSharePenPie *
+        (rateSnapshot.cummulativeRatePenPie - accountSnapshot.lastCummulativeRatePenPie) +
+      accountSnapshot.lastShareEQB *
+        (rateSnapshot.cummulativeRateEQB - accountSnapshot.lastCummulativeRateEQB);
+
+    const timeDiff = timestamp - accountSnapshot.lastUpdatedAt;
+
+    accountSnapshot.lastShare = usersShares[i];
+    accountSnapshot.lastUpdatedAt = timestamp;
+    accountSnapshot.lastCumulativeRate = rateSnapshot.cummulativeRate;
+    accountSnapshot.lastCummulativeRateEQB = rateSnapshot.cummulativeRateEQB;
+    accountSnapshot.lastCummulativeRatePenPie = rateSnapshot.cummulativeRatePenPie;
+    accountSnapshot.lastSharePenPie = usersSharesPenPie.length > 0 ? usersSharesPenPie[i] : BigInt(0);
+    accountSnapshot.lastShareEQB = usersSharesEQB.length > 0 ? usersSharesEQB[i] : BigInt(0);
+
+    const accruedPoints =
+      cumulativeRateDiff /
+      (MISC_CONSTS.ONE_E18 * 3600n);
+
+    updateAccountPromises.push(
+      increasePoint(
+        ctx,
+        POINT_SOURCE_LP,
+        address,
+        accountSnapshot,
+        accruedPoints,
+        timeDiff,
+        timestamp,
+        cumulativeRateDiff
+      )
     );
   }
-  const newSnapshot = {
-    _id: account,
-    lastUpdatedAt: timestamp,
-    lastImpliedHolding: impliedSy.toString(),
-  };
+  await Promise.all(updateAccountPromises);
+}
 
-  ctx.eventLogger.emit(EVENT_USER_SHARE, {
-    label: POINT_SOURCE_LP,
+async function increasePoint(
+  ctx: EthContext,
+  label: POINT_SOURCE,
+  account: string,
+  accountSnapshot: AccountSnapshotLP,
+  accruedPoints: bigint,
+  timeDiff: bigint,
+  updatedAt: bigint,
+  cumulativeRateDiff: bigint,
+) {
+  ctx.eventLogger.emit(EVENT_POINT_INCREASE, {
+    label,
     account: account,
-    share: impliedSy,
+    amountEEthHolding: cumulativeRateDiff,
+    holdingPeriod: timeDiff,
+    zPoint: accruedPoints.scaleDown(18),
+    updatedAt,
+    severity: LogLevel.INFO,
   });
-
-  await db.asyncUpdate({ _id: account }, newSnapshot, { upsert: true });
+  await ctx.store.upsert(accountSnapshot);
 }
