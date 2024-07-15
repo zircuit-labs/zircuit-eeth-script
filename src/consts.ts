@@ -41,12 +41,13 @@ export const PENDLE_POOL_ADDRESSES = {
   ],
 };
 
-export const V1_END_TIMESTAMP = 1719446399n; // 2024-06-26 23:59:59 UTC
+export const V1_END_TIMESTAMP = 1719446400n; // 2024-06-27 00:00:00 UTC
 
 export const MULTIPLIERS = {
   campaign: {
     startTimestamp: 1719187200n, // 2024-06-24 00:00:00 UTC
-    endTimestamp: 1720655999n, // 2024-07-10 23:59:59 UTC
+    syStartTimestamp: V1_END_TIMESTAMP,
+    endTimestamp: 1720656000n, // 2024-07-11 00:00:00 UTC
     multiplier: 200n,
   },
   multiplier: 150n,
